@@ -1,0 +1,36 @@
+from sqlmodel import SQLModel
+from datetime import datetime
+from pydantic.generics import GenericModel
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class PostRead(SQLModel):
+    title: str
+    content: str
+    created_at: datetime
+    published: bool = True
+
+class PostUpdate(SQLModel):
+    title: str
+    content: str
+    published: bool = True
+
+# class PostResponse(SQLModel):
+#     data: PostRead
+
+# it will return the same data as PostRead but wrapped in a "data" key, which is a common convention for API responses.
+# {
+#   "data": {
+#     "id": ...,
+#     "title": ...,
+#     "content": ...,
+#     "published": ...,
+#     "created_at": ...
+#   }
+# } This allows for a consistent response structure and makes it easier to add additional metadata or fields in the future without changing the existing data format.
+
+class Envelope(GenericModel, Generic[T]):
+    data: T
+
+# The Envelope class is a generic wrapper that can be used to standardize API responses. By using a generic type T, it allows you to wrap any type of data in a consistent structure. For example, you could use Envelope[PostRead] to wrap a PostRead object, or Envelope[List[PostRead]] to wrap a list of PostRead objects. This approach promotes consistency in your API responses and makes it easier to manage and extend your response formats in the future.
