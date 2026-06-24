@@ -3,6 +3,7 @@ import logging
 from typing import List, Optional
 from unittest import result
 from fastapi import Body, FastAPI, HTTPException, status, Depends
+from pwdlib import PasswordHash
 from pydantic import BaseModel
 import psycopg
 from psycopg.rows import dict_row
@@ -11,10 +12,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 
 from .database import get_session, init_db, close_db
-from .models import Post
-from .schema import PostRead, PostUpdate, Envelope
+from .models import Post, User
+from .schema import PostResponse, PostUpdate, Envelope, PostCreate, UserCreate, UserResponse
+from .utils import hash_password
 
 logger = logging.getLogger("uvicorn.error")
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,26 +43,17 @@ while True:
     except Exception as e:
         logger.error("Database connection failed:", e)
 
-# my_posts = [{"title": "title of post 1", "content": "content of post 1", "id": 1},
-#             {"title": "title of post 2", "content": "content of post 2", "id": 2}]
-
-@app.get("/sqlmodel")
-async def test_posts(session: AsyncSession = Depends(get_session)) -> dict:
-    statement = select(Post)
-    results = await session.exec(statement)
-    posts = results.all()
-    return {"data": posts}
 
 @app.get("/")
 async def root():
     return {"message": "Hello World!!!"}
 
 @app.get("/posts")
-async def get_posts(session: AsyncSession = Depends(get_session)) -> dict:
+async def get_posts(session: AsyncSession = Depends(get_session)) -> List[PostResponse]:
     statement = select(Post)
     results = await session.exec(statement)
     posts = results.all()
-    return {"data": posts}
+    return posts
 # async def get_posts() -> dict:
 #     with psycopg.connect("dbname=fastapi user=postgres password='romumne' host=localhost port=5432") as conn:
 #         with conn.cursor(row_factory=dict_row) as cur:
@@ -67,12 +62,15 @@ async def get_posts(session: AsyncSession = Depends(get_session)) -> dict:
 #     return {"data": posts}
 
 
-@app.post("/posts", response_model=Envelope[PostRead], status_code=status.HTTP_201_CREATED)
-async def create_post(post: Post, session: AsyncSession = Depends(get_session)) -> dict:
-    session.add(post)
+# @app.post("/posts", response_model=Envelope[PostResponse], status_code=status.HTTP_201_CREATED)
+@app.post("/posts", status_code=status.HTTP_201_CREATED)
+async def create_post(post: PostCreate, session: AsyncSession = Depends(get_session)) -> PostResponse:
+    new_post = Post(**post.model_dump()) # unpacking the PostCreate schema into the Post model
+    session.add(new_post)
     await session.commit()
-    await session.refresh(post)
-    return {"data": post}
+    await session.refresh(new_post)
+    return new_post
+    # return {"data": post}
 # async def create_post(post: Post) -> dict: 
 #     with psycopg.connect("dbname=fastapi user=postgres password='romumne' host=localhost port=5432") as conn:
 #         with conn.cursor(row_factory=dict_row) as cur:
@@ -84,15 +82,16 @@ async def create_post(post: Post, session: AsyncSession = Depends(get_session)) 
 #     return {"data": new_post}
 
     
-@app.get("/posts/{id}", response_model=Envelope[PostRead])
-async def get_post(id: int, session: AsyncSession = Depends(get_session)) -> dict:
+# @app.get("/posts/{id}", response_model=Envelope[PostResponse])
+@app.get("/posts/{id}")
+async def get_post(id: int, session: AsyncSession = Depends(get_session)) -> PostResponse:
     # statement = select(Post).where(Post.id == id) # When you query by a primary key index, the database does a fast index lookup (O(log n)), not a full table scan (O(n))
     # results = await session.exec(statement)
     # post = results.first()
     post = await session.get(Post, id) # This is more efficient for primary key lookups
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} was not found")
-    return {"data": post}
+    return post
 # async def get_post(id: int) -> dict:
 #     with psycopg.connect("dbname=fastapi user=postgres password='romumne' host=localhost port=5432") as conn:
 #         with conn.cursor(row_factory=dict_row) as cur:
@@ -119,8 +118,9 @@ async def delete_post(id: int, session: AsyncSession = Depends(get_session)) -> 
     #         if not deleted_post:
     #             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} was not found")
 
-@app.put("/posts/{id}", response_model=Envelope[PostRead])
-async def update_post(id: int, updated_post: PostUpdate, session: AsyncSession = Depends(get_session)) -> dict:
+# @app.put("/posts/{id}", response_model=Envelope[PostResponse])
+@app.put("/posts/{id}")
+async def update_post(id: int, updated_post: PostUpdate, session: AsyncSession = Depends(get_session)) -> PostResponse:
     post = await session.get(Post, id)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} does not exist")
@@ -129,7 +129,7 @@ async def update_post(id: int, updated_post: PostUpdate, session: AsyncSession =
     post.published = updated_post.published
     await session.commit()
     await session.refresh(post)
-    return {"data": post}
+    return post
     
     # with psycopg.connect("dbname=fastapi user=postgres password='romumne' host=localhost port=5432") as conn:
     #     with conn.cursor(row_factory=dict_row) as cur:
@@ -141,4 +141,18 @@ async def update_post(id: int, updated_post: PostUpdate, session: AsyncSession =
     # if not updated_post:
     #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} does not exist")
     # return {"data": updated_post}
+@app.post("/users", status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserCreate, session: AsyncSession = Depends(get_session)) -> UserResponse: 
+    user.password = hash_password(user.password)
+    new_user = User(**user.model_dump())
+    session.add(new_user)
+    await session.commit()
+    await session.refresh(new_user)
+    return new_user
 
+@app.get("/users/{id}")
+async def get_user(id: int, session: AsyncSession = Depends(get_session)) -> UserResponse:
+    user = await session.get(User, id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"user with id {id} was not found")
+    return user
