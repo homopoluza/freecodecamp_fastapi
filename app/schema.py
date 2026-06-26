@@ -2,7 +2,7 @@ from sqlmodel import SQLModel
 from datetime import datetime
 from pydantic.generics import GenericModel
 from pydantic import EmailStr
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Optional
 
 T = TypeVar('T')
 
@@ -49,3 +49,10 @@ class UserResponse(SQLModel):
     id: int
     email: EmailStr
     created_at: datetime
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str
+
+class TokenData(SQLModel):
+    id: Optional[int] = None

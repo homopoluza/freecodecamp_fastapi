@@ -18,6 +18,6 @@ class Post(SQLModel, table = True):
 class User(SQLModel, table=True):
     __tablename__ = "users"
     id: int = Field(default=None, primary_key=True)
-    email: str = Field(sa_column=Column(String, nullable=False, unique=True))
+    email: str = Field(sa_column=Column(String, nullable=False, unique=True)) # index=True is not needed because unique=True automatically creates an index
     password: str = Field(sa_column=Column(String, nullable=False))
     created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False, server_default=func.now()))
