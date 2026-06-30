@@ -13,12 +13,13 @@ class PostResponse(SQLModel):
     created_at: datetime
     published: bool = True
     user_id: int
+    user: UserResponse
 
 class PostCreate(SQLModel):
     title: str
     content: str
     published: bool = True
-    
+
 class PostUpdate(SQLModel):
     title: str
     content: str

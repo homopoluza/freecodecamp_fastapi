@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field, func
+from sqlmodel import SQLModel, Relationship, Field, func
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
 from datetime import datetime
 
@@ -23,6 +23,7 @@ class Post(SQLModel, table = True):
                 nullable=False
             )
     )
+    user: User = Relationship()
 
 class User(SQLModel, table=True):
     __tablename__ = "users"

@@ -1,5 +1,3 @@
-from httpx import post
-
 from .. models import Post, User
 from .. schema import PostResponse, PostUpdate, Envelope, PostCreate
 from .. database import get_session
@@ -8,6 +6,7 @@ from .. oauth2 import get_current_user
 
 from fastapi import HTTPException, status, Depends, APIRouter
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import selectinload, joinedload
 from typing import List
 from sqlmodel import select
 
@@ -18,8 +17,14 @@ router = APIRouter(
 
 
 @router.get("/")
-async def get_posts(session: AsyncSession = Depends(get_session)) -> List[PostResponse]:
-    statement = select(Post)
+async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "") -> List[PostResponse]:
+    statement = statement = (
+    select(Post)
+    .options(selectinload(Post.user))
+    .filter(Post.title.ilike(f"%{search}%") | Post.content.ilike(f"%{search}%")) # wildcard search for title or content containing the search string, case-insensitive
+    .limit(limit)
+    .offset(skip)
+) # It fixes MissingGreenlet error when using async with selectinload. It is a more efficient way to load related data in a single query, rather than making separate queries for each post's user. 
     results = await session.exec(statement)
     posts = results.all()
 
@@ -44,7 +49,14 @@ async def get_post(id: int, session: AsyncSession = Depends(get_session)) -> Pos
     # statement = select(Post).where(Post.id == id) # When you query by a primary key index, the database does a fast index lookup (O(log n)), not a full table scan (O(n))
     # results = await session.exec(statement)
     # post = results.first()
-    post = await session.get(Post, id) # This is more efficient for primary key lookups
+    statement = (
+        select(Post)
+        .where(Post.id == id)
+        .options(joinedload(Post.user))  # eager-load user
+    )
+    # post = await session.get(Post, id) # This is more efficient for primary key lookups
+    result = await session.exec(statement)
+    post = result.first()
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} was not found")
     

@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+DATABASE_URL = f'postgresql+psycopg://{settings.database_username}:{settings.database_password}@{settings.database_hostname}:{settings.database_port}/{settings.database_name}'
+
 # Async engine
-engine = create_async_engine(settings.database_url, echo=settings.debug)
+engine = create_async_engine(DATABASE_URL, echo=settings.debug)
 
 # Async session factory
 async_session = sessionmaker(

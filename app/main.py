@@ -7,8 +7,6 @@ from .routers import post, user, auth
 
 logger = logging.getLogger("uvicorn.error")
 
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
