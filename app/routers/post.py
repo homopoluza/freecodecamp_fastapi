@@ -1,3 +1,5 @@
+from httpx import post
+
 from .. models import Post, User
 from .. schema import PostResponse, PostUpdate, Envelope, PostCreate
 from .. database import get_session
@@ -27,7 +29,7 @@ async def get_posts(session: AsyncSession = Depends(get_session)) -> List[PostRe
 # @app.post("/posts", response_model=Envelope[PostResponse], status_code=status.HTTP_201_CREATED)
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_post(post: PostCreate, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)) -> PostResponse:
-    new_post = Post(**post.model_dump()) # unpacking the PostCreate schema into the Post model
+    new_post = Post(user_id=current_user.id, **post.model_dump()) # unpacking the PostCreate schema into the Post model
     session.add(new_post)
     await session.commit()
     await session.refresh(new_post)
@@ -53,6 +55,9 @@ async def delete_post(id: int, session: AsyncSession = Depends(get_session), cur
     post = await session.get(Post, id)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} was not found")
+    if post.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Not authorized to delete this post")
+    
     await session.delete(post)
     await session.commit()
 
@@ -64,6 +69,9 @@ async def update_post(id: int, updated_post: PostUpdate, session: AsyncSession =
     post = await session.get(Post, id)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} does not exist")
+    if post.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Not authorized to update this post")
+
     post.title = updated_post.title
     post.content = updated_post.content
     post.published = updated_post.published

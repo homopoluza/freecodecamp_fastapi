@@ -2,21 +2,23 @@ from sqlmodel import SQLModel
 from datetime import datetime
 from pydantic.generics import GenericModel
 from pydantic import EmailStr
-from typing import Generic, TypeVar, Optional
+from typing import Generic, TypeVar
 
 T = TypeVar('T')
 
 class PostResponse(SQLModel):
+    id: int
     title: str
     content: str
     created_at: datetime
     published: bool = True
+    user_id: int
 
 class PostCreate(SQLModel):
     title: str
     content: str
     published: bool = True
-
+    
 class PostUpdate(SQLModel):
     title: str
     content: str
@@ -55,4 +57,4 @@ class Token(SQLModel):
     token_type: str
 
 class TokenData(SQLModel):
-    id: Optional[int] = None
+    id: int | None = None

@@ -26,7 +26,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> d
 def verify_access_token(token: str, credentials_exception) -> TokenData:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        id: str = payload .get("user_id")
+        id: int = payload .get("user_id")
         if id is None:
             raise credentials_exception
         token_data = TokenData(id=id)
@@ -44,7 +44,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: AsyncSe
 
     token = verify_access_token(token, credentials_exception)
     user  = await session.get(User, token.id)
-
+    print("============================/n")
+    print(f"get_current_user: {user}")
     return user
 
 
