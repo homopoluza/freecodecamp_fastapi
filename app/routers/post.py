@@ -1,5 +1,5 @@
-from .. models import Post, User
-from .. schema import PostResponse, PostUpdate, Envelope, PostCreate
+from .. models import Post, User, Vote
+from .. schema import PostResponse, PostUpdate, Envelope, PostCreate, PostWithVotes
 from .. database import get_session
 from .. oauth2 import get_current_user
 
@@ -8,7 +8,7 @@ from fastapi import HTTPException, status, Depends, APIRouter
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from typing import List
-from sqlmodel import select
+from sqlmodel import select, func
 
 router = APIRouter(
     prefix="/posts",
@@ -17,18 +17,27 @@ router = APIRouter(
 
 
 @router.get("/")
-async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "") -> List[PostResponse]:
-    statement = statement = (
-    select(Post)
-    .options(selectinload(Post.user))
-    .filter(Post.title.ilike(f"%{search}%") | Post.content.ilike(f"%{search}%")) # wildcard search for title or content containing the search string, case-insensitive
-    .limit(limit)
-    .offset(skip)
-) # It fixes MissingGreenlet error when using async with selectinload. It is a more efficient way to load related data in a single query, rather than making separate queries for each post's user. 
+async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "") -> List[PostWithVotes]:
+    statement = (
+        select(Post, func.count(Vote.post_id).label("votes"))
+        .join(Vote, Post.id == Vote.post_id, isouter=True)
+        .options(selectinload(Post.user))
+        .filter(Post.title.ilike(f"%{search}%") | Post.content.ilike(f"%{search}%"))
+        .group_by(Post.id)
+        .limit(limit)
+        .offset(skip)
+    )
     results = await session.exec(statement)
-    posts = results.all()
+    rows = results.all() # returns a list of tuples, where each tuple contains a Post object and the corresponding vote count. (Post, votes)
 
-    return posts
+    return [
+        PostWithVotes(
+            **post.model_dump(),
+            user=post.user, # post.model_dump() gives you a dict of the Post fields, but it usually does not include related fields like user unless you explicitly dump them. That’s why user=post.user is needed.
+            votes=votes,
+        )
+        for post, votes in rows
+    ]
 
 
 # @app.post("/posts", response_model=Envelope[PostResponse], status_code=status.HTTP_201_CREATED)
@@ -91,4 +100,4 @@ async def update_post(id: int, updated_post: PostUpdate, session: AsyncSession =
     await session.refresh(post)
 
     return post
-    
+
