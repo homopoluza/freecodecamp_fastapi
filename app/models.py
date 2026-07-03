@@ -38,3 +38,20 @@ class User(SQLModel, table=True):
             server_default=func.now()
             )
         )
+    
+class Vote(SQLModel, table=True):
+    __tablename__ = "votes"
+    user_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("users.id", ondelete="CASCADE"),
+            primary_key=True
+        )
+    )
+    post_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("posts.id", ondelete="CASCADE"),
+            primary_key=True
+        )
+    )

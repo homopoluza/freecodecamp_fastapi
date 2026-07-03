@@ -1,8 +1,9 @@
 from sqlmodel import SQLModel
 from datetime import datetime
 from pydantic.generics import GenericModel
-from pydantic import EmailStr
+from pydantic import EmailStr, conint
 from typing import Generic, TypeVar
+from enum import Enum
 
 T = TypeVar('T')
 
@@ -59,3 +60,11 @@ class Token(SQLModel):
 
 class TokenData(SQLModel):
     id: int | None = None
+
+class VoteDirection(int, Enum):
+    DOWN = 0
+    UP = 1
+
+class VoteSchema(SQLModel):
+    post_id: int
+    dir: VoteDirection
