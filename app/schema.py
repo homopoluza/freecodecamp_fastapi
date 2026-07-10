@@ -15,6 +15,7 @@ class PostResponse(SQLModel):
     published: bool = True
     user_id: int
     user: UserResponse
+    votes: int
 
 class PostCreate(SQLModel):
     title: str
@@ -26,8 +27,8 @@ class PostUpdate(SQLModel):
     content: str
     published: bool = True
 
-class PostWithVotes(PostResponse):
-    votes: int
+# class PostWithVotes(PostResponse):
+#     votes: int
 
 # class PostResponse(SQLModel):
 #     data: PostRead

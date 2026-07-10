@@ -1,5 +1,7 @@
+from re import search
+
 from .. models import Post, User, Vote
-from .. schema import PostResponse, PostUpdate, Envelope, PostCreate, PostWithVotes
+from .. schema import PostResponse, PostUpdate, Envelope, PostCreate
 from .. database import get_session
 from .. oauth2 import get_current_user
 
@@ -17,7 +19,7 @@ router = APIRouter(
 
 
 @router.get("/")
-async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "") -> List[PostWithVotes]:
+async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "") -> List[PostResponse]:
     statement = (
         select(Post, func.count(Vote.post_id).label("votes"))
         .join(Vote, Post.id == Vote.post_id, isouter=True)
@@ -31,7 +33,7 @@ async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 1
     rows = results.all() # returns a list of tuples, where each tuple contains a Post object and the corresponding vote count. (Post, votes)
 
     return [
-        PostWithVotes(
+        PostResponse(
             **post.model_dump(),
             user=post.user, # post.model_dump() gives you a dict of the Post fields, but it usually does not include related fields like user unless you explicitly dump them. That’s why user=post.user is needed.
             votes=votes,
@@ -58,18 +60,34 @@ async def get_post(id: int, session: AsyncSession = Depends(get_session)) -> Pos
     # statement = select(Post).where(Post.id == id) # When you query by a primary key index, the database does a fast index lookup (O(log n)), not a full table scan (O(n))
     # results = await session.exec(statement)
     # post = results.first()
+    # statement = (
+    #     select(Post)
+    #     .where(Post.id == id)
+    #     .options(joinedload(Post.user))  # eager-load user
+    # )
+    # post = await session.get(Post, id) # This is more efficient for primary key lookups. Doesn't work with joinedload, so we use the select statement above instead.
     statement = (
-        select(Post)
+        select(Post, func.count(Vote.post_id).label("votes"))
+        .join(Vote, Post.id == Vote.post_id, isouter=True)
+        .options(selectinload(Post.user)) # 2 queries instead of 1 query with a join, but it’s more efficient for large datasets because it avoids the Cartesian product problem. It fetches the posts and their users in one query, and then fetches the votes in a separate query. Plus, joinedload doesn't work here anyway because we are using an aggregate function (count) which requires a group by clause, and joinedload doesn't support that.
         .where(Post.id == id)
-        .options(joinedload(Post.user))  # eager-load user
-    )
-    # post = await session.get(Post, id) # This is more efficient for primary key lookups
+        .group_by(Post.id)
+        )
+
     result = await session.exec(statement)
     post = result.first()
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id {id} was not found")
     
-    return post
+    post, votes = post # unpack the tuple returned by the query into the Post object and the vote count
+
+    return PostResponse(
+        **post.model_dump(),
+        user=post.user, # post.model_dump() gives you a dict of the Post fields, but it usually does not include related fields like user unless you explicitly dump them. That’s why user=post.user is needed.
+        votes=votes,
+    )
+
+
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(id: int, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)) -> None:

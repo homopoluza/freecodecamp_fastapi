@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic>=1.18.5",
     "fastapi[all]>=0.123.7",
     "psycopg[binary]>=3.3.2",
     "pwdlib[argon2]>=0.3.0",
