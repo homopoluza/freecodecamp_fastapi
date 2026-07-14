@@ -1,0 +1,31 @@
+name: ''
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    ports:
+      - "5432:5432"        # expose PostgreSQL on localhost:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Almaty
+    networks:
+      - internal_net
+
+  fastapi:
+    build: .
+    container_name: fastapi
+    networks:
+      - internal_net
+    restart: unless-stopped
+    expose:
+      - "8000"
+    depends_on:
+      - postgres              
+
+networks:
+  internal_net:
+
+volumes:
+  postgres_data:
