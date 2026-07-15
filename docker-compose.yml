@@ -3,10 +3,17 @@ services:
   postgres:
     image: postgres
     container_name: postgres
-    ports:
-      - "5432:5432"        # expose PostgreSQL on localhost:5432
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose:
+      - "5432"        # expose PostgreSQL on localhost:5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     restart: unless-stopped
     environment:
       - TZ=Asia/Almaty
@@ -15,14 +22,20 @@ services:
 
   fastapi:
     build: .
+    env_file:
+      - .env
     container_name: fastapi
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - internal_net
     restart: unless-stopped
-    expose:
-      - "8000"
-    depends_on:
-      - postgres              
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             uv run uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 networks:
   internal_net:
