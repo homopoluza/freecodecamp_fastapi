@@ -42,8 +42,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session: AsyncSe
 
     token = verify_access_token(token, credentials_exception)
     user  = await session.get(User, token.id)
-    print("============================/n")
-    print(f"get_current_user: {user}")
+    # print("============================/n")
+    # print(f"get_current_user: {user}")
     return user
 
 

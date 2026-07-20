@@ -19,7 +19,7 @@ router = APIRouter(
 
 
 @router.get("/")
-async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "") -> List[PostResponse]:
+async def get_posts(session: AsyncSession = Depends(get_session), limit: int = 10, skip: int = 0, search: str = "", current_user: User = Depends(get_current_user)) -> List[PostResponse]:
     statement = (
         select(Post, func.count(Vote.post_id).label("votes"))
         .join(Vote, Post.id == Vote.post_id, isouter=True)
