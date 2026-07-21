@@ -1,7 +1,8 @@
+from collections.abc import AsyncGenerator
+
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
-from typing import AsyncGenerator
 from sqlmodel import SQLModel
 
 from app.config import settings
@@ -11,7 +12,7 @@ from app.database import get_session
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
-DATABASE_URL = f'postgresql+psycopg://{settings.database_username}:{settings.database_password}@{settings.database_hostname}:{settings.database_port}/{settings.database_name}_test'
+DATABASE_URL: str = f'postgresql+psycopg://{settings.database_username}:{settings.database_password}@{settings.database_hostname}:{settings.database_port}/{settings.database_name}_test'
 
 # Async engine
 engine = create_async_engine(DATABASE_URL, echo=settings.debug)
@@ -32,17 +33,17 @@ app.dependency_overrides[get_session] = override_get_session
 
 # --- Async tests (pytest-asyncio + httpx.AsyncClient) ---
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_test_db():
+async def setup_test_db() -> AsyncGenerator[None, None]:
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     yield
-    # async with engine.begin() as conn:
-    #     await conn.run_sync(SQLModel.metadata.drop_all) # for pytest with -x, will stop the test session after the first failure. So for debugging, you might want to comment this out to inspect the database state after a failure.
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all) # for pytest with -x, will stop the test session after the first failure. So for debugging, you might want to comment this out to inspect the database state after a failure.
 
     await engine.dispose() # avoid "ResourceWarning: unclosed <sqlalchemy.ext.asyncio.engine.AsyncEngine object at ...>" warning and resource leak
 
 @pytest_asyncio.fixture
-async def async_client():
+async def async_client() -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
